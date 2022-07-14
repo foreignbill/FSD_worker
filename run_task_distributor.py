@@ -3,6 +3,7 @@ import logging
 
 import traceback
 import json
+import redis
 
 from tornado.ioloop import IOLoop
 
@@ -24,6 +25,10 @@ if __name__ == "__main__":
     # logger
     parser.add_argument("--logger_filepath", type=str, default="./log/distributor.log")
     parser.add_argument("--logger_level", type=str2loglevel, default=logging.NOTSET)
+    # redis lock
+    parser.add_argument("--redis_server", type=str, default="localhost")
+    parser.add_argument("--redis_port", type=int, default=6379)
+    parser.add_argument("--redis_pwd", type=str, default="")
     args = parser.parse_args()
 
     # logger in task distributer
@@ -40,6 +45,10 @@ if __name__ == "__main__":
     console.setFormatter(formatter)
     logger.addHandler(console)
 
+    client = redis.StrictRedis(
+        connection_pool=redis.BlockingConnectionPool(max_connections=15, host=args.redis_server, port=args.redis_port,
+                                                     password=args.redis_pwd))
+
     logger.info("starting with args: %s" % args)
 
     task_distributor_db = TaskDistributorDB(
@@ -53,6 +62,7 @@ if __name__ == "__main__":
         port=args.server_port,
         address=args.server_address,
         database=task_distributor_db,
+        redis_cli=client,
     )
 
     IOLoop.current().start()

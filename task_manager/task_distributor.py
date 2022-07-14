@@ -1,4 +1,6 @@
 import logging
+import time
+
 import sqlalchemy
 import traceback
 from functools import partial
@@ -16,6 +18,8 @@ from descriptor.task_manager_heartbeat import HeartBeat
 from descriptor.task_manager_results import Result, FatalResult
 from descriptor.task_manager_worker import Worker
 from descriptor.task_manager_tasks import NoTask, Task
+import redis
+import redis_lock
 from task_manager.utils import read_until_symbol, check_passwd
 from task_manager.databases import TaskDistributorDB
 import json
@@ -39,6 +43,7 @@ class TaskDistributor(TCPServer):
                  port: int,
                  address: str,
                  database: TaskDistributorDB,
+                 redis_cli,
                  ssl_options: Union[Dict[str, Any], ssl.SSLContext] = None,
                  max_buffer_size: int = None,
                  read_chunk_size: int = None
@@ -46,6 +51,7 @@ class TaskDistributor(TCPServer):
         super().__init__(ssl_options, max_buffer_size, read_chunk_size)
         self._logger = logging.getLogger(__name__)
         self._database: TaskDistributorDB = database
+        self._redis_cli = redis_cli
 
         self._executor = ThreadPoolExecutor()
         self._loop: IOLoop = IOLoop.current()
@@ -122,11 +128,9 @@ class TaskDistributor(TCPServer):
             return
         worker_id = await self._get_worker_id(worker.user_name)
         await self._update_worker_info(str(worker_id), worker)
-
         try:
             # check worker request
             if worker.request_type == Worker.REQUEST_TASK:
-                self._logger.info("client %s:%d request task", address[0], address[1])
                 await self._deal_with_request_task(stream, worker_id, worker, address)
             elif worker.request_type == Worker.REQUEST_RESULT:
                 self._logger.info("client %s:%d request result", address[0], address[1])
@@ -189,38 +193,44 @@ class TaskDistributor(TCPServer):
 
     async def _deal_with_request_task(self, stream: IOStream, client_id: int, worker: Worker, address: Tuple):
         self._logger.info("client %s:%d request tasks", address[0], address[1])
-        task: Task = NoTask()
-        try:
-            left_memory = await self._get_left_memory(worker)
-            task: Task = await self._get_task(left_memory)
-            # no task
-            if isinstance(task, NoTask):
-                self._logger.debug("sending NoTask")
-                await stream.write(task.to_byte_str())
+        with redis_lock.Lock(self._redis_cli, "request tasks"):
+            self._logger.info("processed client %s:%d request tasks", address[0], address[1])
+            task: Task = NoTask()
+            try:
+                left_memory = await self._get_left_memory(worker)
+                task: Task = await self._get_task(left_memory)
+                # no task
+                if isinstance(task, NoTask):
+                    self._logger.info("sending NoTask %s: %d", address[0], address[1])
+                    await stream.write(task.to_byte_str())
+                    self._close_connection(stream)
+                    return
+            except Exception as e:
+                tb = traceback.format_exc()
+                self._logger.error(
+                    "while getting task from database, error: \n%s occurs, traceback: \n%s",
+                    e, tb
+                )
                 self._close_connection(stream)
                 return
-        except Exception as e:
-            tb = traceback.format_exc()
-            self._logger.error(
-                "while getting task from database, error: \n%s occurs, traceback: \n%s",
-                e, tb
-            )
-            self._close_connection(stream)
-            return
 
-        # record getting task successfully
-        try:
-            self._logger.info("sending task: %s", task)
-            await stream.write(task.to_byte_str())
-            # TODO: move to callback
-            await self._set_distributed(task.uuid, client_id)
-            self._logger.info("assign task %s successfully", task)
-        except StreamClosedError:
-            if not isinstance(task, NoTask):
-                self._logger.warning(
-                    "connection from %s:%d is closed unexpectedly, reassigning task",
-                    address[0], address[1])
-            await self._reassign_task(task.uuid)
+            # record getting task successfully
+            try:
+                self._logger.info("sending task: %s", task)
+                await stream.write(task.to_byte_str())
+                # TODO: move to callback
+                # TODO: for redis lock test
+                import time
+                time.sleep(20)
+                # TODO: end for redis lock test
+                await self._set_distributed(task.uuid, client_id)
+                self._logger.info("assign task %s successfully", task)
+            except StreamClosedError:
+                if not isinstance(task, NoTask):
+                    self._logger.warning(
+                        "connection from %s:%d is closed unexpectedly, reassigning task",
+                        address[0], address[1])
+                await self._reassign_task(task.uuid)
 
     async def _deal_with_heartbeat(self, stream: IOStream, address: Tuple, worker: Worker):
         try:
