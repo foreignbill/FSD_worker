@@ -212,7 +212,7 @@ class Launcher:
         bash_cmd = []
         # pip install environments
         if cfg['requirements']:
-            bash_cmd.append("pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r " + cfg['requirements'])
+            bash_cmd.append("pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r " + cfg['requirements'])
             bash_cmd.append('echo "pip finished."')
 
         # initial tasks commands
