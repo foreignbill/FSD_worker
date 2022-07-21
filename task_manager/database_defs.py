@@ -33,6 +33,8 @@ class ServerTable(BaseAtlasCenterTable):
     password = Column(String(128), nullable=False)
     last_login = Column(DateTime, nullable=True)
     worker_info = Column(LONGBLOB(2 ** 32 - 1), nullable=True, default=b"")
+    ip = Column(String(39), nullable=False, default="127.0.0.1")
+    available_port = Column(Integer, nullable=True, default=34567)
 
 
 # task manager table

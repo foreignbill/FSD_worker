@@ -71,7 +71,6 @@ class TaskDistributor(TCPServer):
         return ret_val
 
     async def _login_in(self, user_name: str, login_pw: str):
-        # TODO: add login in
         self._logger.debug("_login_in")
         try:
             hashed_passwd = await self._run_async(
@@ -86,7 +85,6 @@ class TaskDistributor(TCPServer):
             )
             hashed_passwd = None
 
-        check_val = False
         try:
             if check_passwd(login_pw, hashed_passwd):
                 check_val = True
@@ -120,14 +118,13 @@ class TaskDistributor(TCPServer):
             )
             return
 
-        # TODO: check worker
         worker: Worker = Worker.from_byte_str(worker_description_byte)
         if not await self._login_in(worker.user_name, worker.pass_word):
             self._logger.info("login verify failed %s:%d", address[0], address[1])
             self._close_connection(stream)
             return
         worker_id = await self._get_worker_id(worker.user_name)
-        await self._update_worker_info(str(worker_id), worker)
+        await self._update_worker_info(str(worker_id), worker, address[0], worker.available_port)
         try:
             # check worker request
             if worker.request_type == Worker.REQUEST_TASK:
@@ -178,14 +175,15 @@ class TaskDistributor(TCPServer):
         self._logger.debug("_get_worker_id")
         return await self._run_async(self._database.get_worker_id, worker_name=worker_name)
 
-    async def _update_worker_info(self, worker_id: str, worker: Worker):
+    async def _update_worker_info(self, worker_id: str, worker: Worker, ip: str, available_port: int):
         self._logger.debug("_update_worker_info")
         worker_history = await self._run_async(self._database.get_worker_history_info, worker_id=worker_id)
         worker_info = unserialize(worker_history)['worker_infos']
         if worker_info is None:
             worker_info = []
         return await self._run_async(self._database.update_worker_info, worker_id=worker_id,
-                                     worker_info=worker.worker_info, worker_infos=worker_info)
+                                     worker_info=worker.worker_info, worker_infos=worker_info, ip=ip,
+                                     available_port=available_port)
 
     async def _write_heartbeat(self, heartbeat: HeartBeat):
         self._logger.debug("_write_heartbeat")
@@ -218,11 +216,11 @@ class TaskDistributor(TCPServer):
             try:
                 self._logger.info("sending task: %s", task)
                 await stream.write(task.to_byte_str())
-                # TODO: move to callback
-                # TODO: for redis lock test
-                import time
-                time.sleep(20)
-                # TODO: end for redis lock test
+                # # TODO: move to callback
+                # # TODO: for redis lock test
+                # import time
+                # time.sleep(20)
+                # # TODO: end for redis lock test
                 await self._set_distributed(task.uuid, client_id)
                 self._logger.info("assign task %s successfully", task)
             except StreamClosedError:

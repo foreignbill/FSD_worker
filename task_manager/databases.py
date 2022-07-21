@@ -142,7 +142,8 @@ class TaskDistributorDB:
         )
         return worker_info
 
-    def update_worker_info(self, worker_id: str, worker_info: WorkerInfo, worker_infos: list):
+    def update_worker_info(self, worker_id: str, worker_info: WorkerInfo, worker_infos: list, ip: str,
+                           available_port: int):
 
         # self._db.set_fields_by_index(
         #     value_dict=dict(
@@ -161,7 +162,9 @@ class TaskDistributorDB:
             value_dict=dict(
                 worker_info=worker_info_list_to_byte_str(worker_info.driver_version, worker_info.cuda_version,
                                                          worker_infos, end_with=b""),
-                last_login=datetime.utcnow()
+                last_login=datetime.utcnow(),
+                ip=ip,
+                available_port=available_port
             ),
             id_field='id',
             id=worker_id,
