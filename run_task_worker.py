@@ -30,6 +30,8 @@ if __name__ == "__main__":
     # logger
     parser.add_argument("--logger_filepath", type=str, default="./log/worker.log")
     parser.add_argument("--logger_level", type=str2loglevel, default=logging.NOTSET)
+    # net
+    parser.add_argument("--network", type=str, default="lo")
     # gpu
     parser.add_argument("--gpu", type=str, default="0")
     args = parser.parse_args()
@@ -72,7 +74,8 @@ if __name__ == "__main__":
         database=task_worker_db,
         database_kwargs=db_kwargs,
         workspace=args.workspace,
-        gpu=args.gpu
+        gpu=args.gpu,
+        network=args.network
     )
 
     IOLoop.current().start()

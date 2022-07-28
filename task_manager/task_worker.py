@@ -41,6 +41,7 @@ class TaskWorker(TCPClient):
             database_kwargs: dict,
             workspace: str,
             gpu: str,
+            network: str,
             resolver: Resolver = None
     ):
         super().__init__(resolver)
@@ -59,6 +60,7 @@ class TaskWorker(TCPClient):
         self._task_handler = set()
         self._workspace = os.path.abspath(workspace)
         self._gpu = gpu
+        self._network = network
         self._http_client = AsyncHTTPClient()
 
         self._database_kwargs = database_kwargs
