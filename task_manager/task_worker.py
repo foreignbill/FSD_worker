@@ -121,6 +121,11 @@ class TaskWorker(TCPClient):
                     e, tb
                 )
             for task in task_list:
+                if task.ddp_config:
+                    self._logger.debug(task.ddp_config)
+                    if int(task.ddp_config['node_rank']) != 0:
+                        self._logger.info(f"Task {task.uuid} is an ignorable branch of distributed training.")
+                        continue
                 try:
                     await self._send_heartbeat(task)
                 except Exception as e:
@@ -425,7 +430,7 @@ class TaskWorker(TCPClient):
         # record task
         self._logger.debug("Add task: %s" % task)
         self._task_handler.add(task.uuid)
-        return
+        # return
 
         # data augmentation mission
         if hasattr(task, 'varient'):
