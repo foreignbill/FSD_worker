@@ -57,8 +57,6 @@ class Task(BaseTask):
             setattr(self, key, val)
 
     def to_byte_str(self, end_with: bytes = STOP_SYMBOL) -> bytes:
-        print(self)
-        print(dir(self))
         # remove _task_name/_uuid
         task_args = {}
         for k, v in self.__dict__.items():

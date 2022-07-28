@@ -6,6 +6,7 @@ from os import urandom
 from typing import Union
 
 from redis import StrictRedis
+# Documentation: https://redis.readthedocs.io/en/latest/
 
 __version__ = '3.7.0'
 

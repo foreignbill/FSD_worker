@@ -10,6 +10,7 @@ from tornado.ioloop import IOLoop
 from task_manager.task_distributor import TaskDistributor
 from task_manager.utils import str2loglevel
 from task_manager.databases import TaskDistributorDB
+# from redis_lock.django_cache import RedisCache
 
 if __name__ == "__main__":
     # parse args
@@ -48,6 +49,7 @@ if __name__ == "__main__":
     client = redis.StrictRedis(
         connection_pool=redis.BlockingConnectionPool(max_connections=15, host=args.redis_server, port=args.redis_port,
                                                      password=args.redis_pwd))
+    # redis_cache = RedisCache()
 
     logger.info("starting with args: %s" % args)
 

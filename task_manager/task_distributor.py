@@ -23,6 +23,8 @@ import redis_lock
 from task_manager.utils import read_until_symbol, check_passwd
 from task_manager.databases import TaskDistributorDB
 import json
+from base64 import b64encode
+from os import urandom
 
 
 def unserialize(obj):
@@ -102,7 +104,11 @@ class TaskDistributor(TCPServer):
                 hashed_passwd, ve, tb
             )
             check_val = False
-
+        if check_val:
+            # if check_val means that password is correct
+            # then add this device to online-device
+            # expired set to 30s
+            self._redis_cli.set(f"online-device: {user_name}", b64encode(urandom(18)).decode('ascii'), ex=30)
         return check_val
 
     async def handle_stream(self, stream: IOStream, address):
@@ -146,17 +152,45 @@ class TaskDistributor(TCPServer):
 
         self._close_connection(stream)
 
-    async def _get_task(self, left_memory) -> Task:
+    async def _get_task(self, left_memory, master_addr, master_port) -> Task:
         self._logger.debug("_get_task")
-        # TODO: single gpu
         # task memory args
         # check tasks demands
         if left_memory[0] < 6000:
             task = NoTask()
             return task
+
+        self._logger.debug(f"distributed task work size: {self._redis_cli.llen('ddp_task')}")
+        if self._redis_cli.llen('ddp_task') > 0:
+            task = self._redis_cli.lpop('ddp_task')
+            task = task[:-len(STOP_SYMBOL)]
+            task = Task.from_byte_str(task)
+            self._logger.debug(f"found distributed task: {task}")
+            return task
+
+        self._logger.debug('There is no distributed ddp task on redis, search for new tasks')
         task: Union[Task, None] = await self._run_async(self._database.get_task)
         if task is None:
             task = NoTask()
+            return task
+        ddp_config = None
+        if task.ddp_config:
+            ddp_config = task.ddp_config
+        # has ddp task
+        self._logger.debug('distribute ddp task.')
+        if ddp_config is not None and ddp_config['ddp_training'] and int(ddp_config['ddp_num']) > 1:
+            self._redis_cli.delete('ddp_task')
+            for i in range(1, int(ddp_config['ddp_num'])):
+                task.ddp_config['node_rank'] = i
+                task.ddp_config['master_addr'] = master_addr
+                task.ddp_config['master_port'] = master_port
+                self._redis_cli.rpush('ddp_task', task.to_byte_str())
+
+            main_task = task
+            main_task.ddp_config['node_rank'] = 0
+            main_task.ddp_config['master_addr'] = master_addr
+            main_task.ddp_config['master_port'] = master_port
+            task = main_task
         return task
 
     async def _set_distributed(self, task_id: str, server_id: int):
@@ -193,10 +227,9 @@ class TaskDistributor(TCPServer):
         self._logger.info("client %s:%d request tasks", address[0], address[1])
         with redis_lock.Lock(self._redis_cli, "request tasks"):
             self._logger.info("processed client %s:%d request tasks", address[0], address[1])
-            task: Task = NoTask()
             try:
                 left_memory = await self._get_left_memory(worker)
-                task: Task = await self._get_task(left_memory)
+                task: Task = await self._get_task(left_memory, address[0], worker.available_port)
                 # no task
                 if isinstance(task, NoTask):
                     self._logger.info("sending NoTask %s: %d", address[0], address[1])
@@ -216,12 +249,8 @@ class TaskDistributor(TCPServer):
             try:
                 self._logger.info("sending task: %s", task)
                 await stream.write(task.to_byte_str())
-                # # TODO: move to callback
-                # # TODO: for redis lock test
-                # import time
-                # time.sleep(20)
-                # # TODO: end for redis lock test
-                await self._set_distributed(task.uuid, client_id)
+                # TODO: for debug
+                # await self._set_distributed(task.uuid, client_id)
                 self._logger.info("assign task %s successfully", task)
             except StreamClosedError:
                 if not isinstance(task, NoTask):

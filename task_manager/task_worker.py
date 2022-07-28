@@ -423,6 +423,7 @@ class TaskWorker(TCPClient):
         # record task
         self._logger.debug("Add task: %s" % task)
         self._task_handler.add(task.uuid)
+        return
 
         # data augmentation mission
         if hasattr(task, 'varient'):
