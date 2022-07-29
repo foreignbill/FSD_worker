@@ -49,7 +49,8 @@ if __name__ == "__main__":
     client = redis.StrictRedis(
         connection_pool=redis.BlockingConnectionPool(max_connections=15, host=args.redis_server, port=args.redis_port,
                                                      password=args.redis_pwd))
-    # redis_cache = RedisCache()
+    # init flush all
+    client.flushall()
 
     logger.info("starting with args: %s" % args)
 
