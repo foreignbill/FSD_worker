@@ -250,7 +250,7 @@ class TaskDistributor(TCPServer):
                 self._logger.info("sending task: %s", task)
                 await stream.write(task.to_byte_str())
                 # TODO: for debug
-                # await self._set_distributed(task.uuid, client_id)
+                await self._set_distributed(task.uuid, client_id)
                 self._logger.info("assign task %s successfully", task)
             except StreamClosedError:
                 if not isinstance(task, NoTask):

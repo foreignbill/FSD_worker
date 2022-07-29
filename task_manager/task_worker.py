@@ -122,8 +122,7 @@ class TaskWorker(TCPClient):
                 )
             for task in task_list:
                 if task.ddp_config:
-                    self._logger.debug(task.ddp_config)
-                    if int(task.ddp_config['node_rank']) != 0:
+                    if task.ddp_config['ddp_training'] is True and int(task.ddp_config['node_rank']) != 0:
                         self._logger.info(f"Task {task.uuid} is an ignorable branch of distributed training.")
                         continue
                 try:
@@ -228,14 +227,15 @@ class TaskWorker(TCPClient):
                                     progress_bar[idx] = item_val.simple_value
                             else:
                                 # transfer wall time to default time.time()
-                                launcher.feedback.update_vis_data(item.wall_time * 1000, f'{launcher.task_names[idx]}_{item_val.tag}', item.step,
+                                launcher.feedback.update_vis_data(item.wall_time * 1000,
+                                                                  f'{launcher.task_names[idx]}_{item_val.tag}',
+                                                                  item.step,
                                                                   item_val.simple_value)
             prog = 0.0
             for p in progress_bar:
                 prog += p
             prog = prog * 1.0 / launcher.task_nums
             launcher.feedback.update_progress(prog)
-
 
     async def _wait_until_task_finished(self):
         launcher = self._launcher
@@ -504,7 +504,8 @@ class TaskWorker(TCPClient):
             return {node.tag: node.text for node in el if node.tag in tags}
 
         p = Popen(
-            ['docker', 'run', '--rm', '--gpus', f'\"device={self._gpu}\"', 'pytorch/pytorch:1.7.1-cuda11.0-cudnn8-devel',
+            ['docker', 'run', '--rm', '--gpus', f'\"device={self._gpu}\"',
+             'pytorch/pytorch:1.7.1-cuda11.0-cudnn8-devel',
              'nvidia-smi', '-q', '-x'],
             stdout=PIPE, stderr=STDOUT)
 

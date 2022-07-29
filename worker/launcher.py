@@ -180,7 +180,6 @@ class Launcher:
         return ret
 
     def prepare_run_cmd(self, algorithm_path, model_path_list, dataset_path_list, ddp_config=None):
-        self.logger.info(f"ddp_config: {ddp_config}")
         # read yaml config
         cfg = None
         cfg_file_path = os.path.join(algorithm_path, "task.yaml")
