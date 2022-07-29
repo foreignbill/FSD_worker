@@ -107,7 +107,7 @@ class Feedback(dict):
 
 
 class Launcher:
-    def __init__(self, task, database_kwargs, backend_api, gpu, username, passwd, workspace, logger):
+    def __init__(self, task, database_kwargs, backend_api, gpu, username, passwd, workspace, logger, network):
         self.task = task
         self.db_interface = TaskWorkerDB(**database_kwargs)
         self.backend_api = backend_api
@@ -117,6 +117,7 @@ class Launcher:
         self.workspace = workspace
         self.task_workspace = os.path.join(self.workspace, self.task.uuid)
         self.logger = logger
+        self.network = network
         self.feedback = Feedback()
         self.process = None
         self.upload_export_url = "%s/api/task/upload_export" % self.backend_api
@@ -178,7 +179,8 @@ class Launcher:
             ret.append(find_in_config(reorg_arg, config_args))
         return ret
 
-    def prepare_run_cmd(self, algorithm_path, model_path_list, dataset_path_list):
+    def prepare_run_cmd(self, algorithm_path, model_path_list, dataset_path_list, ddp_config=None):
+        self.logger.info(f"ddp_config: {ddp_config}")
         # read yaml config
         cfg = None
         cfg_file_path = os.path.join(algorithm_path, "task.yaml")
@@ -186,6 +188,12 @@ class Launcher:
         cfg = yaml.safe_load(f.read())
 
         cmds = ['docker', 'run', '--rm', '--gpus', f'\"device={self.gpu}\"']
+
+        ddp_training = False
+        if ddp_config is not None:
+            ddp_training = ddp_config['ddp_training']
+            if ddp_training:
+                cmds = cmds + ['--network', 'host', '--env', f'NCCL_SOCKET_IFNAME={self.network}']
 
         # algorithm path mapping
         cmds = cmds + ['-v', '%s:/workspace' % algorithm_path]
@@ -217,7 +225,9 @@ class Launcher:
 
         # initial tasks commands
         if cfg['tasks']:
+            # number of tasks
             self.task_nums = len(cfg['tasks'])
+            # name of tasks
             self.task_names = []
             for task_key in cfg['tasks']:
                 self.task_names.append(task_key)
@@ -227,10 +237,14 @@ class Launcher:
                 # config args
                 if 'args' in task:
                     config_args = task['args']
-                    if config_args is None:
-                        continue
-                    entrypoints = [task['entrypoints']]
-                    entrypoints += self._get_run_args(reorg_args, config_args)
+                    if ddp_training and task.get('dist_entrypoints') is not None:
+                        entrypoints = [task['dist_entrypoints'].format(ddp_config['ddp_num'], ddp_config['node_rank'],
+                                                                       ddp_config['master_addr'],
+                                                                       ddp_config['master_port'])]
+                    else:
+                        entrypoints = [task['entrypoints']]
+                    if config_args is not None:
+                        entrypoints += self._get_run_args(reorg_args, config_args)
                     bash_cmd.append(" ".join(entrypoints))
                     bash_cmd.append(f'echo "{task_key} finished."')
 
@@ -295,7 +309,7 @@ class Launcher:
         self.feedback.add_log("准备运行环境...", self.feedback.INFO)
         self.db_interface.update_note(self.task.uuid, self.feedback)
         run_cmds = self.prepare_run_cmd(algorithm_path=algorithm_path, model_path_list=model_path_list,
-                                        dataset_path_list=dataset_path_list)
+                                        dataset_path_list=dataset_path_list, ddp_config=self.task.ddp_config)
         self.logger.info(run_cmds)
 
         self.feedback.add_log("创建运行进程...", self.feedback.INFO)

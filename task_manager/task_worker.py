@@ -379,7 +379,8 @@ class TaskWorker(TCPClient):
             username=self._username,
             passwd=self._password,
             workspace=self._workspace,
-            logger=self._logger
+            logger=self._logger,
+            network=self._network
         )
 
         self._launcher.run_sample_generate(varient=varient)
@@ -430,7 +431,6 @@ class TaskWorker(TCPClient):
         # record task
         self._logger.debug("Add task: %s" % task)
         self._task_handler.add(task.uuid)
-        # return
 
         # data augmentation mission
         if hasattr(task, 'varient'):
@@ -451,7 +451,8 @@ class TaskWorker(TCPClient):
             username=self._username,
             passwd=self._password,
             workspace=self._workspace,
-            logger=self._logger
+            logger=self._logger,
+            network=self._network
         )
 
         self._launcher.run()
