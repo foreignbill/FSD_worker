@@ -121,7 +121,7 @@ class TaskWorker(TCPClient):
                     e, tb
                 )
             for task in task_list:
-                if task.ddp_config:
+                if dir(task).count('ddp_config') != 0:
                     if task.ddp_config['ddp_training'] is True and int(task.ddp_config['node_rank']) != 0:
                         self._logger.info(f"Task {task.uuid} is an ignorable branch of distributed training.")
                         continue

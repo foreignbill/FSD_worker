@@ -171,10 +171,9 @@ class TaskDistributor(TCPServer):
         self._logger.debug('There is no distributed ddp task on redis, search for new tasks')
         task: Union[Task, None] = await self._run_async(self._database.get_task)
         if task is None:
-            task = NoTask()
-            return task
+            return NoTask()
         ddp_config = None
-        if task.ddp_config:
+        if dir(task).count('ddp_config') != 0:
             ddp_config = task.ddp_config
         # has ddp task
         self._logger.debug('distribute ddp task.')
