@@ -68,13 +68,21 @@ class WorkerInfo(BaseDescriptor):
     def __init__(self, driver_version, cuda_version):
         self._driver_version = driver_version
         self._cuda_version = cuda_version
+        self._total = 0
         self._gpus_info = []
+        self._processes_info = []
         now = datetime.utcnow()
         time_stamp = now.timestamp()
         self._time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(time_stamp))
 
     def add_gpu(self, gpu_info: GpuInfo):
         self._gpus_info.append(gpu_info)
+
+    def add_process_info(self, process_info: dict):
+        self._processes_info.append(process_info)
+
+    def set_total(self, total):
+        self._total = total
 
     @property
     def driver_version(self):
@@ -83,6 +91,10 @@ class WorkerInfo(BaseDescriptor):
     @property
     def cuda_version(self):
         return self._cuda_version
+
+    @property
+    def total(self):
+        return self._total
 
     # @property
     def get_gpu(self, idx):
@@ -99,7 +111,9 @@ class WorkerInfo(BaseDescriptor):
         js = {
             'driver_version': self._driver_version,
             'cuda_version': self._cuda_version,
+            'total': self._total,
             'gpus_info': gpus_info_list,
+            'processes_info': self._processes_info,
             'time': self._time
         }
         return json.dumps(js, default=str).encode('utf-8') + end_with
@@ -111,7 +125,9 @@ class WorkerInfo(BaseDescriptor):
         js = {
             'driver_version': self._driver_version,
             'cuda_version': self._cuda_version,
+            'total': self._total,
             'gpus_info': gpus_info_list,
+            'processes_info': self._processes_info,
             'time': self._time
         }
         return js
@@ -132,10 +148,11 @@ class WorkerInfo(BaseDescriptor):
         return ret
 
 
-def worker_info_list_to_byte_str(driver_version, cuda_version, worker_infos, end_with: bytes = STOP_SYMBOL) -> bytes:
+def worker_info_list_to_byte_str(driver_version, cuda_version, total_memory, worker_infos, end_with: bytes = STOP_SYMBOL) -> bytes:
     js = {
         'driver_version': driver_version,
         'cuda_version': cuda_version,
+        'total_memory': total_memory,
         'worker_infos': worker_infos
     }
     return json.dumps(js, default=str).encode('utf-8') + end_with

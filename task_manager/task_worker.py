@@ -504,7 +504,7 @@ class TaskWorker(TCPClient):
             return {node.tag: node.text for node in el if node.tag in tags}
 
         p = Popen(
-            ['docker', 'run', '--rm', '--gpus', f'\"device={self._gpu}\"',
+            ['docker', 'run', '--rm', '--gpus', f'\"device={self._gpu}\"', '--pid=host',
              'pytorch/pytorch:1.7.1-cuda11.0-cudnn8-devel',
              'nvidia-smi', '-q', '-x'],
             stdout=PIPE, stderr=STDOUT)
@@ -516,6 +516,7 @@ class TaskWorker(TCPClient):
 
         worker_info = WorkerInfo(driver_version, cuda_version)
         num_gpus = int(xml.findtext('attached_gpus'))
+        total_memory = 0
 
         for gpu_id, gpu in enumerate(xml.iter('gpu')):
             name = gpu.findtext('product_name')
@@ -527,6 +528,7 @@ class TaskWorker(TCPClient):
             memory_usage = gpu.find('fb_memory_usage')
             memory_info = xml_dict(memory_usage, ['total', 'used', 'free'])
             total = memory_info['total']
+            total_memory += int(str(total).split(' ')[0])
             memory = memory_info['used']
 
             utilization_info = gpu.find('utilization')
@@ -534,5 +536,13 @@ class TaskWorker(TCPClient):
 
             gpu_info = GpuInfo(name, fan, temp, perf, pwr, memory, total, utilization)
             worker_info.add_gpu(gpu_info)
+
+            processes = gpu.find('processes')
+            for id, process in enumerate(processes.iter('process_info')):
+                pid = process.findtext('pid')
+                used_memory = process.findtext('used_memory')
+                worker_info.add_process_info(dict({'pid': pid, 'used_memory': used_memory}))
+
+        worker_info.set_total(total_memory)
 
         return worker_info

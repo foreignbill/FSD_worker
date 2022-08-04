@@ -161,6 +161,7 @@ class TaskDistributorDB:
         self._db.set_fields_by_index(
             value_dict=dict(
                 worker_info=worker_info_list_to_byte_str(worker_info.driver_version, worker_info.cuda_version,
+                                                         worker_info.total,
                                                          worker_infos, end_with=b""),
                 last_login=datetime.utcnow(),
                 ip=ip,
