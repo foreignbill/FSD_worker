@@ -269,8 +269,8 @@ class Launcher:
 
         bash_cmd = [f'python code/eval.py --varient={varient} --work_dir=/export', 'echo "task finished"']
 
-        # 使用 and
-        cmds = cmds + ['bash', '-c', " && ".join(bash_cmd)]
+        # 使用 and or
+        cmds = cmds + ['bash', '-c', " || ".join([" && ".join(bash_cmd), 'echo "task failed"'])]
 
         return cmds
 
