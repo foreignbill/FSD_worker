@@ -224,7 +224,7 @@ class TaskDistributor(TCPServer):
 
     async def _deal_with_request_task(self, stream: IOStream, client_id: int, worker: Worker, address: Tuple):
         self._logger.info("client %s:%d request tasks", address[0], address[1])
-        with redis_lock.Lock(self._redis_cli, "request tasks"):
+        with redis_lock.Lock(self._redis_cli, "request tasks", expire=30):
             self._logger.info("processed client %s:%d request tasks", address[0], address[1])
             try:
                 left_memory = await self._get_left_memory(worker)
@@ -248,7 +248,6 @@ class TaskDistributor(TCPServer):
             try:
                 self._logger.info("sending task: %s", task)
                 await stream.write(task.to_byte_str())
-                # TODO: for debug
                 await self._set_distributed(task.uuid, client_id)
                 self._logger.info("assign task %s successfully", task)
             except StreamClosedError:

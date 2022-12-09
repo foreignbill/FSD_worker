@@ -240,7 +240,8 @@ class Launcher:
                         entrypoints = [task['dist_entrypoints'].format(ddp_config['ddp_num'], ddp_config['node_rank'],
                                                                        ddp_config['master_addr'],
                                                                        ddp_config['master_port'])]
-                    else:
+                    # TODO: fix
+                    elif not ddp_training:
                         entrypoints = [task['entrypoints']]
                     if config_args is not None:
                         entrypoints += self._get_run_args(reorg_args, config_args)
@@ -250,8 +251,8 @@ class Launcher:
         # tag for checking if successfully work
         bash_cmd.append('echo "task finished"')
 
-        # 使用 and
-        cmds = cmds + ['bash', '-c', " && ".join(bash_cmd)]
+        # 使用 and or
+        cmds = cmds + ['bash', '-c', " || ".join([" && ".join(bash_cmd), 'echo "task failed"'])]
 
         return cmds
 
