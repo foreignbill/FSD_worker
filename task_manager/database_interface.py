@@ -178,6 +178,8 @@ class DBInterface:
             row = session.query(table_type).filter(getattr(table_type, id_field) == id).one()
             setattr(row, field, value)
             session.commit()
+        # except NoResultFound:
+        #     self._logger.info("No result found for query %s=%s", id_field, id)
         except Exception as e:
             tb = traceback.format_exc()
             self._logger.error(

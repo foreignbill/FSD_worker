@@ -156,7 +156,9 @@ class TaskDistributor(TCPServer):
         self._logger.debug("_get_task")
         # task memory args
         # check tasks demands
+        # if left_memory[0] < 6000:
         if left_memory[0] < 6000:
+            self._logger.debug("没算力了，剩余算力：%s" % left_memory[0])
             task = NoTask()
             return task
 
@@ -224,6 +226,8 @@ class TaskDistributor(TCPServer):
 
     async def _deal_with_request_task(self, stream: IOStream, client_id: int, worker: Worker, address: Tuple):
         self._logger.info("client %s:%d request tasks", address[0], address[1])
+        # 这是一个Redis分布式锁的上下文管理器，它将在代码块中保持锁，以确保只有一个进程 / 线程可以处理请求任务的请求。这里，redis_cli是Redis
+        # 客户端，"request tasks"是锁的名称，expire = 30是锁的过期时间为30秒。
         with redis_lock.Lock(self._redis_cli, "request tasks", expire=30):
             self._logger.info("processed client %s:%d request tasks", address[0], address[1])
             try:

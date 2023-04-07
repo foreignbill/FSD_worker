@@ -431,12 +431,24 @@ class TaskWorker(TCPClient):
         # record task
         self._logger.debug("Add task: %s" % task)
         self._task_handler.add(task.uuid)
+        #
+        # # data augmentation mission
+        # for attr_name, attr_value in vars(task).items():
+        #     if not attr_name.startswith("__"):
+        #         self._logger.debug("attr_name: %s" % attr_name)
+        #         self._logger.debug("attr_value: %s" % attr_value)
 
-        # data augmentation mission
+        # if hasattr(task, 'varient'):
+        self._logger.debug("task.tasks: %s" % task.tasks)
+        # self._logger.debug("type(task.tasks): %s" % type(task.tasks))
+        # if 'data augmentation' in task.tasks:
         if hasattr(task, 'varient'):
+            self._logger.debug("选择了主页的数据增强")
             await self._deal_with_sample_generate_task(task)
             return
 
+        else:
+            self._logger.debug("没有选择主页的数据增强！！")
         # insert into work database
         await self._insert_task(task)
 
